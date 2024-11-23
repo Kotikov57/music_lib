@@ -4,19 +4,58 @@ package db
 
 import (
 	"database/sql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"log"
-	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	
 )
 
-var Db *gorm.DB
- 
+var Db *sql.DB
+
 // ConnectDatabase подлючает к базе данных
 func ConnectDatabase() {
-	dsn := "host=localhost user=postgres password=fkla5283 dbname= imarket_db port=5432 sslmode=disable TimeZone=UTC"
+	log.Println("[DEBUG] Вход в функцию ConnectDatabase")
+	dsn := "postgres://ivan:fkla5283@localhost:5432/music?sslmode=disable"
 	var err error
-	Db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	Db, err = sql.Open("pgx", dsn)
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal("Ошибка подключения в базе данных:", err)
 		return
 	}
+	if err := Db.Ping(); err != nil {
+		log.Fatal("Ошибка проверки соединения: ", err)
+	}
+	log.Println("[INFO] База данных подключена")
+}
+
+//CloseDatabase закрывает базу данных
+func CloseDatabase() {
+	log.Println("[DEBUG] Вход в функцию CloseDatabase")
+	Db.Close()
+	log.Println("[INFO] База данных закрыта")
+}
+
+//RunMigrations запускает миграции
+func RunMigrations() {
+	log.Println("[DEBUG] Вход в функцию CloseDatabase")
+	driver, err := postgres.WithInstance(Db, &postgres.Config{})
+	if err != nil {
+		log.Fatal("Ошибка создания драйвера миграции:", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://./migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		log.Fatal("Ошибка инициализации миграции:", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal("Ошибка выполнения миграции:", err)
+	}
+	log.Println("[INFO] Миграция выполнена")
 }
