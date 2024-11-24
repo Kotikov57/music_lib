@@ -9,7 +9,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	
+	"effect_mobile/envutils"	
 )
 
 var Db *sql.DB
@@ -17,7 +17,7 @@ var Db *sql.DB
 // ConnectDatabase подлючает к базе данных
 func ConnectDatabase() {
 	log.Println("[DEBUG] Вход в функцию ConnectDatabase")
-	dsn := "postgres://ivan:fkla5283@localhost:5432/music?sslmode=disable"
+	dsn := envutils.GetDatabaseURL()
 	var err error
 	Db, err = sql.Open("pgx", dsn)
 	if err != nil {
@@ -46,7 +46,7 @@ func RunMigrations() {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migrations",
+		envutils.GetMigrationsDir(),
 		"postgres",
 		driver,
 	)

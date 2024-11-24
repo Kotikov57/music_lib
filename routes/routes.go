@@ -13,7 +13,10 @@ import (
 	"net/http"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	_ "effect_mobile/docs"
 )
+
+func InitRoutes(router *gin.Engine)
 
 //GetData получает все строки из базы данных
 func GetData(c *gin.Context) {
@@ -59,7 +62,7 @@ func GetData(c *gin.Context) {
 	log.Println("[INFO] Запрос успешно выполнен")
 }
 
-//GetText получает текст песни по параметрам song и group
+//GetText получает из базы данных текст песни по параметрам song и group
 func GetText(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию GetText")
 	groupParam := c.Query("group")
@@ -117,13 +120,15 @@ func GetText(c *gin.Context) {
 	log.Println("[INFO] Запрос успешно выполнен")
 }
 
-//DeleteData удаляет информацию по параметру song
+//DeleteData удаляет из базы данных информацию по параметру song 
 func DeleteData(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию DeleteData")
+	groupParam := c.Query("group")
+	log.Printf("[DEBUG] groupParam = %s", groupParam)
 	songParam := c.Query("song")
 	log.Printf("[DEBUG] songParam = %s", songParam)
 
-	result, err := db.Db.Exec("DELETE FROM music WHERE song = $1", songParam)
+	result, err := db.Db.Exec(`DELETE FROM music WHERE "group = $1 AND song = $2`, groupParam, songParam)
 	if err != nil {
 		log.Println("[ERROR] Ошибка при удалении записи:", err)
 		c.JSON(500, gin.H{"error":"Ошибка базы данных"})
@@ -146,9 +151,11 @@ func DeleteData(c *gin.Context) {
 	log.Println("[INFO] Запрос успешно выполнен")
 }
 
-//PutData изменяет информация о конкретной песне
+//PutData изменяет информация о конкретной песне в базе данных
 func PutData(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию PutData")
+	groupParam := c.Query("group")
+	log.Printf("[DEBUG] groupParam = %s", groupParam)
 	songParam := c.Query("song")
 	log.Printf("[DEBUG] songParam = %s", songParam)
 
@@ -159,8 +166,8 @@ func PutData(c *gin.Context) {
 		return
 	}
 
-	query := `UPDATE music SET "group" = $1, song = $2, releaseDate = $3, text = $4, link = $5 WHERE song = $6`
-	result, err := db.Db.Exec(query, updatedData.Group, updatedData.Song, updatedData.ReleaseDate, updatedData.Text, updatedData.Link, songParam)
+	query := `UPDATE music SET "group" = $1, song = $2, releaseDate = $3, text = $4, link = $5 WHERE "group" = $6 AND song = $7`
+	result, err := db.Db.Exec(query, updatedData.Group, updatedData.Song, updatedData.ReleaseDate, updatedData.Text, updatedData.Link, groupParam, songParam)
 	if err != nil {
 		log.Println("[ERROR] Ошибка выполнения запроса:", err)
 		c.JSON(500, gin.H{"error": "Ошибка базы данных"})
@@ -183,7 +190,7 @@ func PutData(c *gin.Context) {
 	log.Println("[INFO] Запрос успешно выполнен")
 }
 
-//PostData добавляет информацию о песне и делает запрос в внешний АПИ для получения дополнительных данных
+//PostData добавляет информацию о песне в базу данных
 func PostData(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию PutData")
 	var newData models.Music
@@ -230,9 +237,10 @@ func PostData(c *gin.Context) {
 	log.Println("[INFO] Запрос успешно выполнен")
 }
 
+//getSongDetailsFromAPI делает запрос в внешний АПИ для получения дополнительных данных (releaseDate, text, link)
 func getSongDetailsFromAPI(group string, song string) (*models.Music) {
 	log.Println("[DEBUG] Вход в функцию getSongDetailsFromAPI")
-    url := fmt.Sprintf("http://your-api.com/info?group=%s&song=%s", group, song)
+    url := fmt.Sprintf("http:/some-api.com/info?group=%s&song=%s", group, song)
 	log.Printf("[DEBUG] url = %s", url)
     resp, err := http.Get(url)
     if err != nil {
