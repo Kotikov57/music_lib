@@ -4,12 +4,12 @@ package db
 
 import (
 	"database/sql"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"log"
+	"effect_mobile/envutils"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"effect_mobile/envutils"	
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"log"
 )
 
 var Db *sql.DB
@@ -30,14 +30,14 @@ func ConnectDatabase() {
 	log.Println("[INFO] База данных подключена")
 }
 
-//CloseDatabase закрывает базу данных
+// CloseDatabase закрывает базу данных
 func CloseDatabase() {
 	log.Println("[DEBUG] Вход в функцию CloseDatabase")
 	Db.Close()
 	log.Println("[INFO] База данных закрыта")
 }
 
-//RunMigrations запускает миграции
+// RunMigrations запускает миграции
 func RunMigrations() {
 	log.Println("[DEBUG] Вход в функцию CloseDatabase")
 	driver, err := postgres.WithInstance(Db, &postgres.Config{})

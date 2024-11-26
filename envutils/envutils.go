@@ -1,13 +1,13 @@
-//utils Пакет предназначенный для работы с env-файлом
+// utils Пакет предназначенный для работы с env-файлом
 package envutils
 
 import (
+	"github.com/joho/godotenv"
 	"log"
 	"os"
-	"github.com/joho/godotenv"
 )
 
-//init подключает env-файл
+// init подключает env-файл
 func init() {
 	err := godotenv.Load()
 	if err != nil {
@@ -16,7 +16,7 @@ func init() {
 
 }
 
-//GetEnvVariable получает значение переменной окружения из env-файла
+// GetEnvVariable получает значение переменной окружения из env-файла
 func GetEnvVariable(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
@@ -25,12 +25,12 @@ func GetEnvVariable(key string) string {
 	return value
 }
 
-//GetDatabaseURL получает из env-файла ссылку для подключения в базе данных
+// GetDatabaseURL получает из env-файла ссылку для подключения в базе данных
 func GetDatabaseURL() string {
 	return GetEnvVariable("DATABASE_URL")
 }
 
-//GetMigrationsDir получает из env-файла директорию с миграциями
+// GetMigrationsDir получает из env-файла директорию с миграциями
 func GetMigrationsDir() string {
 	return GetEnvVariable("MIGRATIONS_DIR")
 }

@@ -1,4 +1,168 @@
+basePath: /
+definitions:
+  models.Music:
+    properties:
+      details:
+        $ref: '#/definitions/models.SongDetail'
+      main:
+        $ref: '#/definitions/models.Song'
+    type: object
+  models.Song:
+    properties:
+      group:
+        type: string
+      song:
+        type: string
+    type: object
+  models.SongDetail:
+    properties:
+      link:
+        type: string
+      releaseDate:
+        type: string
+      text:
+        type: string
+    type: object
+host: localhost:8080
 info:
   contact: {}
-paths: {}
+  description: API для работы с музыкой
+  title: Music API
+  version: "1.0"
+paths:
+  /info:
+    delete:
+      description: удаляет данные песни по группе и названию
+      parameters:
+      - description: Группа
+        in: query
+        name: group
+        required: true
+        type: string
+      - description: Песня
+        in: query
+        name: song
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Удалить данные песни
+      tags:
+      - Music
+    get:
+      description: Возвращает все данные о всех песнях
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Music'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Получить данные о песнях
+      tags:
+      - Music
+    post:
+      consumes:
+      - application/json
+      description: Добавляет данные песни и делает запрос в внешний АПИ для получения
+        дополнительных данных
+      parameters:
+      - description: Группа и название
+        in: body
+        name: music
+        required: true
+        schema:
+          $ref: '#/definitions/models.Song'
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Добавить данные песни
+      tags:
+      - Music
+    put:
+      description: Изменяет данные песни по группе и названию
+      parameters:
+      - description: Группа
+        in: query
+        name: group
+        required: true
+        type: string
+      - description: Песня
+        in: query
+        name: song
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Изменить данные песни
+      tags:
+      - Music
+  /texts:
+    get:
+      description: Возвращает текст песни по группе и названию
+      parameters:
+      - description: Группа
+        in: query
+        name: group
+        required: true
+        type: string
+      - description: Песня
+        in: query
+        name: song
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Получить текст песни
+      tags:
+      - Music
 swagger: "2.0"
