@@ -34,3 +34,8 @@ func GetDatabaseURL() string {
 func GetMigrationsDir() string {
 	return GetEnvVariable("MIGRATIONS_DIR")
 }
+
+//GetOutAPI получается из env-файла адрес внешнего API
+func GetOutAPI() string {
+	return GetEnvVariable("OUT_API_URL")
+}

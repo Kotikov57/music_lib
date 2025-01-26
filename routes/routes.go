@@ -5,15 +5,19 @@ package routes
 import (
 	"database/sql"
 	"effect_mobile/db"
-	_ "effect_mobile/docs"
+	"time"
+
+	//	"effect_mobile/docs"
+	"effect_mobile/envutils"
 	"effect_mobile/models"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 // GetData получает все строки из базы данных
@@ -28,9 +32,22 @@ func GetData(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	offset := (page - 1) * limit
+	groupName := c.Query("group")
+	startDate := c.Query("startDate")
+	endDate := c.Query("endDate")
+	keyword := c.Query("keyword")
 	log.Printf("[DEBUG] page = %d | limit = %d | offset = %d", page, limit, offset)
-	query := "SELECT * FROM music LIMIT $1 OFFSET $2"
-	rows, err := db.Db.Query(query, limit, offset)
+	query := "SELECT groups.group_name AS group, songs.song_name AS song, release_date, text, link" + 
+	"FROM details" +
+	"JOIN groups ON details.group_id = groups.group_id" +
+	"JOIN songs ON details.song_id = songs.song_id" +
+	"WHERE ($1 = '' OR groups.group_name = $1) " +
+	"AND ($2 = '' OR details.release_date >= $2) AND ($3 = '' OR m.release_date <= $3) " +
+	"AND ($4 = '' OR details.text ILIKE '%' || $4 || '%')" + 
+	"ORDER BY details.release_date DESC;" +
+	"LIMIT $5 OFFSET $6"
+	
+	rows, err := db.Db.Query(query, groupName, startDate, endDate, keyword, limit, offset)
 
 	if err != nil {
 		log.Println("[ERROR] Ошибка выполнения запроса:", err)
@@ -39,9 +56,10 @@ func GetData(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var data []models.Music
+	var data []models.MusicRequest
 
 	for rows.Next() {
+		var req models.MusicRequest
 		var m models.Music
 		err := rows.Scan(&m.Main.Group, &m.Main.Song, &m.Details.ReleaseDate, &m.Details.Text, &m.Details.Link)
 		if err != nil {
@@ -49,8 +67,14 @@ func GetData(c *gin.Context) {
 			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
 			return
 		}
-		log.Printf("[DEBUG] Group = %s | Song = %s | ReleaseDate = %s | Text = %s | Link = %s", m.Main.Group, m.Main.Song, m.Details.ReleaseDate, m.Details.Text, m.Details.Link)
-		data = append(data, m)
+		req.Main.Group = m.Main.Group
+		req.Main.Song = m.Main.Song
+		req.Details.ReleaseDate = m.Details.ReleaseDate.Format("02-01-2006")
+		req.Details.Text = m.Details.Text
+		req.Details.Link = m.Details.Link
+		log.Printf("[DEBUG] Group = %s | Song = %s | ReleaseDate = %s | Text = %s | Link = %s",
+		req.Main.Group, req.Main.Song, req.Details.ReleaseDate, req.Details.Text, req.Details.Link)
+		data = append(data, req)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -78,23 +102,12 @@ func GetData(c *gin.Context) {
 // @Router /texts [get]
 func GetText(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию GetText")
-	groupParam := c.Query("group")
-	songParam := c.Query("song")
-	log.Printf("[DEBUG] groupParam = %s", groupParam)
-	log.Printf("[DEBUG] songParam = %s", songParam)
-	if groupParam == "" {
-		log.Println("[ERROR] Название группы не может быть пустым")
-		c.JSON(400, gin.H{"error": "Название группы не может быть пустым"})
-		return
-	}
-	if songParam == "" {
-		log.Println("[ERROR] Название песни не может быть пустым")
-		c.JSON(400, gin.H{"error": "Название песни не может быть пустым"})
-		return
-	}
+	songIdParam := c.Query("song")
+	log.Printf("[DEBUG] songParam = %s", songIdParam)
 
 	var text string
-	err := db.Db.QueryRow(`SELECT text FROM music WHERE "group" = $1 AND song = $2`, groupParam, songParam).Scan(&text)
+	err := db.Db.QueryRow(`SELECT text FROM details` +
+	`WHERE song_id = $1`, songIdParam).Scan(&text)
 	if err == sql.ErrNoRows {
 		log.Println("[ERROR] Песня не найдена")
 		c.JSON(404, gin.H{"error": "Песня не найдена"})
@@ -145,25 +158,45 @@ func GetText(c *gin.Context) {
 // @Router /info [delete]
 func DeleteData(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию DeleteData")
-	groupParam := c.Query("group")
-	log.Printf("[DEBUG] groupParam = %s", groupParam)
-	songParam := c.Query("song")
-	log.Printf("[DEBUG] songParam = %s", songParam)
+	songIdParam := c.Query("song")
+	log.Printf("[DEBUG] songParam = %s", songIdParam)
 
-	result, err := db.Db.Exec(`DELETE FROM music WHERE "group = $1 AND song = $2`, groupParam, songParam)
+	tx, err := db.Db.Begin()
 	if err != nil {
-		log.Println("[ERROR] Ошибка при удалении записи:", err)
+		c.JSON(500, gin.H{"error" : "Не получилось начать транзакцию"})
+	}
+	defer tx.Rollback()
+	result1, err := tx.Exec(`DELETE FROM details WHERE song_id = $1`, songIdParam)
+	if err != nil {
+		log.Println("[ERROR] Ошибка при удалении записи из details:", err)
+		c.JSON(500, gin.H{"error": "Ошибка базы данных"})
+		return
+	}
+	result2, err := tx.Exec(`DELETE FROM songs WHERE song_id = $1`, songIdParam)
+	if err != nil {
+		log.Println("[ERROR] Ошибка при удалении записи из songs:", err)
 		c.JSON(500, gin.H{"error": "Ошибка базы данных"})
 		return
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	err = tx.Commit()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось закоммитить транзакцию"})
+		return
+	}
+	rowsAffected1, err := result1.RowsAffected()
 	if err != nil {
 		log.Println("[ERROR] Ошибка получения затронутых строк:", err)
 		c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
 		return
 	}
-	if rowsAffected == 0 {
+	rowsAffected2, err := result2.RowsAffected()
+	if err != nil {
+		log.Println("[ERROR] Ошибка получения затронутых строк:", err)
+		c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+		return
+	}
+	if rowsAffected1 == 0 || rowsAffected2 == 0 {
 		log.Println("[ERROR] Запись не найдена:", err)
 		c.JSON(404, gin.H{"error": "Запись не найдена"})
 		return
@@ -186,36 +219,158 @@ func DeleteData(c *gin.Context) {
 // @Router /info [put]
 func PutData(c *gin.Context) {
 	log.Println("[DEBUG] Вход в функцию PutData")
-	groupParam := c.Query("group")
-	log.Printf("[DEBUG] groupParam = %s", groupParam)
-	songParam := c.Query("song")
-	log.Printf("[DEBUG] songParam = %s", songParam)
+	songIdParam := c.Query("song")
+	log.Printf("[DEBUG] songParam = %s", songIdParam)
 
-	var updatedData models.Music
-	if err := c.ShouldBindJSON(&updatedData); err != nil {
+	var updatedDataRequest models.MusicRequest
+	if err := c.ShouldBindJSON(&updatedDataRequest); err != nil {
 		log.Println("[ERROR] Неверный формат данных:", err)
 		c.JSON(400, gin.H{"error": "Неверный формат данных"})
 		return
 	}
-
-	query := `UPDATE music SET "group" = $1, song = $2, releaseDate = $3, text = $4, link = $5 WHERE "group" = $6 AND song = $7`
-	result, err := db.Db.Exec(query, updatedData.Main.Group, updatedData.Main.Song, updatedData.Details.ReleaseDate, updatedData.Details.Text, updatedData.Details.Link, groupParam, songParam)
+	tx, err := db.Db.Begin()
 	if err != nil {
-		log.Println("[ERROR] Ошибка выполнения запроса:", err)
-		c.JSON(500, gin.H{"error": "Ошибка базы данных"})
+		c.JSON(500, gin.H{"error" : "Не получилось начать транзакцию"})
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("UPDATE songs SET song_name = $1 WHERE song_id = $2", updatedDataRequest.Main.Song, songIdParam)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось обновить название песни"})
+		return
+	}
+	date, err := time.Parse("02-01-2006", updatedDataRequest.Details.ReleaseDate)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось преобразовать формат времени"})
+	}
+	_, err = tx.Exec("UPDATE details SET release_date = $1, text = $2, link = $3 WHERE song_id = $4",
+	 date, updatedDataRequest.Details.Text, updatedDataRequest.Details.Link, songIdParam)
+	
+	 if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось обновить данные песни"})
 		return
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	err = tx.Commit()
 	if err != nil {
-		log.Println("[ERROR] Ошибка получения количества строк:", err)
-		c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+		c.JSON(500, gin.H{"error": "Не удалось закоммитить транзакцию"})
 		return
 	}
-	if rowsAffected == 0 {
-		log.Println("[ERROR] Запись не найдена:", err)
-		c.JSON(404, gin.H{"error": "Запись не найдена"})
-		return
+
+	c.JSON(200, gin.H{"message": "Информация обновлена"})
+	log.Println("[INFO] Запрос успешно выполнен")
+}
+
+func PutParam( c *gin.Context) {
+	log.Println("[DEBUG] Вход в функцию PutData")
+	songIdParam := c.Query("song")
+	log.Printf("[DEBUG] songParam = %s", songIdParam)
+	param := c.Query("param")
+	
+	switch param {
+	case "name":
+		var name string
+		if err := c.ShouldBindJSON(&name); err != nil {
+			log.Println("[ERROR] Неверный формат данных:", err)
+			c.JSON(400, gin.H{"error": "Неверный формат данных"})
+			return
+		}
+		result, err := db.Db.Exec("UPDATE songs SET song_name = $1 WHERE song_id = $2", name, songIdParam)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось обновить название песни"})
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("[ERROR] Ошибка получения количества строк:", err)
+			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+			return
+		}
+		if rowsAffected == 0 {
+			log.Println("[ERROR] Запись не найдена:", err)
+			c.JSON(404, gin.H{"error": "Запись не найдена"})
+			return
+		}
+	case "release_date":
+		var date string
+		if err := c.ShouldBindJSON(&date); err != nil {
+			log.Println("[ERROR] Неверный формат данных:", err)
+			c.JSON(400, gin.H{"error": "Неверный формат данных"})
+			return
+		}
+
+		dateFormatted, err := time.Parse("02-01-2006", date)
+		if err != nil {
+			log.Println("[ERROR] Неверный формат времени:", err)
+			c.JSON(400, gin.H{"error": "Неверный формат времени"})
+			return
+		}
+
+		result, err := db.Db.Exec("UPDATE details SET release_id = $1 WHERE song_id = $2", dateFormatted, songIdParam)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось обновить дату релиза песни"})
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("[ERROR] Ошибка получения количества строк:", err)
+			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+			return
+		}
+		if rowsAffected == 0 {
+			log.Println("[ERROR] Запись не найдена:", err)
+			c.JSON(404, gin.H{"error": "Запись не найдена"})
+			return
+		}
+	case "text":
+		var text string
+		if err := c.ShouldBindJSON(&text); err != nil {
+			log.Println("[ERROR] Неверный формат данных:", err)
+			c.JSON(400, gin.H{"error": "Неверный формат данных"})
+			return
+		}
+		result, err := db.Db.Exec("UPDATE details SET text = $1 WHERE song_id = $2", text, songIdParam)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось обновить текст песни"})
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("[ERROR] Ошибка получения количества строк:", err)
+			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+			return
+		}
+		if rowsAffected == 0 {
+			log.Println("[ERROR] Запись не найдена:", err)
+			c.JSON(404, gin.H{"error": "Запись не найдена"})
+			return
+		}
+	case "link":
+		var link string
+		if err := c.ShouldBindJSON(&link); err != nil {
+			log.Println("[ERROR] Неверный формат данных:", err)
+			c.JSON(400, gin.H{"error": "Неверный формат данных"})
+			return
+		}
+		result, err := db.Db.Exec("UPDATE details SET link = $1 WHERE song_id = $2", link, songIdParam)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось обновить ссылку на песню"})
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Println("[ERROR] Ошибка получения количества строк:", err)
+			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
+			return
+		}
+		if rowsAffected == 0 {
+			log.Println("[ERROR] Запись не найдена:", err)
+			c.JSON(404, gin.H{"error": "Запись не найдена"})
+			return
+		}
+	default:
+		log.Println("[ERROR] Некорректный параметр")
+		c.JSON(400, gin.H{"error": "Некорректный параметр"})
 	}
 
 	c.JSON(200, gin.H{"message": "Информация обновлена"})
@@ -233,23 +388,33 @@ func PutData(c *gin.Context) {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /info [post]
 func PostData(c *gin.Context) {
-	log.Println("[DEBUG] Вход в функцию PutData")
+	log.Println("[DEBUG] Вход в функцию PostData")
 	var newSong models.Song
 	if err := c.ShouldBindJSON(&newSong); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-
-	var exists bool
-	err := db.Db.QueryRow(`SELECT EXISTS (SELECT  1 FROM music WHERE "group" = $1 AND song = $2 LIMIT 1)`, newSong.Group, newSong.Song).Scan(&exists)
+	_, err := db.Db.Exec(`
+		INSERT INTO groups (group_name)
+		VALUES ($1)
+		ON CONFLICT (group_name) DO NOTHING;
+	`, newSong.Group)
 	if err != nil {
-		log.Println("[ERROR] Ошибка при проверке существования песни:", err)
-		c.JSON(500, gin.H{"error": "Ошибка при проверке существования песни: " + err.Error()})
+		log.Println("[ERROR] Ошибка при добавлении группы")
+		c.JSON(500, gin.H{"error": "Ошибка при добавлении группы"})
 		return
 	}
-	if exists {
-		log.Println("[ERROR] Песня уже существует")
-		c.JSON(400, gin.H{"error": "Песня уже существует"})
+	_, err = db.Db.Exec(`
+		INSERT INTO songs (group_id, song_name)
+		VALUES (
+			(SELECT group_id FROM groups WHERE group_name = $1),
+			$2
+		)
+		ON CONFLICT (group_id, song_name) DO NOTHING;
+	`, newSong.Group, newSong.Song)
+	if err != nil {
+		log.Println("[ERROR] Ошибка при добавлении песни")
+		c.JSON(500, gin.H{"error": "Ошибка при добавлении песни"})
 		return
 	}
 
@@ -261,14 +426,25 @@ func PostData(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Ошибка при получении данных из АПИ"})
 		return
 	}
-
-	newData.Details.ReleaseDate = songDetails.ReleaseDate
+	date, err := time.Parse("02-01-2006", songDetails.ReleaseDate)
+	if err != nil {
+		log.Println("[ERROR] Неверный формат времени:", err)
+		c.JSON(400, gin.H{"error": "Неверный формат времени"})
+		return
+	}
+	newData.Details.ReleaseDate = date
 	newData.Details.Text = songDetails.Text
 	newData.Details.Link = songDetails.Link
 	log.Printf("[DEBUG] newData.Group = %s | newData.Song = %s | newData.ReleaseDate = %s | newData.Text = %s | newData.Link = %s", newData.Main.Group, newData.Main.Song, newData.Details.ReleaseDate, newData.Details.Text, newData.Details.Link)
-
-	query := `INSERT INTO music ("group", song, releaseDate, text, link) VALUES ($1, $2, $3, $4, $5)`
-	_, err = db.Db.Exec(query, &newData.Main.Group, &newData.Main.Song, &newData.Details.ReleaseDate, &newData.Details.Text, newData.Details.Link)
+	_, err = db.Db.Exec(`
+		INSERT INTO music (song_id, release_date, text, link)
+		VALUES (
+			(SELECT song_id FROM songs WHERE song_name = $1 AND group_id = (SELECT group_id FROM groups WHERE group_name = $2)),
+			$3,
+			$4,
+			$5
+		);
+	`, newSong.Song, newSong.Group, newData.Details.ReleaseDate, newData.Details.Text, newData.Details.Link)
 
 	if err != nil {
 		log.Println("[ERROR] Ошибка добавления данных:", err)
@@ -281,9 +457,10 @@ func PostData(c *gin.Context) {
 }
 
 // getSongDetailsFromAPI делает запрос в внешний АПИ для получения дополнительных данных (releaseDate, text, link)
-func getSongDetailsFromAPI(group string, song string) *models.SongDetail {
+func getSongDetailsFromAPI(group string, song string) *models.SongDetailRequest {
 	log.Println("[DEBUG] Вход в функцию getSongDetailsFromAPI")
-	url := fmt.Sprintf("http:/some-api.com/info?group=%s&song=%s", group, song)
+	api_url := envutils.GetOutAPI()
+	url := fmt.Sprintf(api_url, group, song)
 	log.Printf("[DEBUG] url = %s", url)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -298,7 +475,7 @@ func getSongDetailsFromAPI(group string, song string) *models.SongDetail {
 		return nil
 	}
 
-	var songDetails models.SongDetail
+	var songDetails models.SongDetailRequest
 	if err := json.NewDecoder(resp.Body).Decode(&songDetails); err != nil {
 		log.Println("[ERROR] Ошибка при декодировании ответа АПИ: ", err)
 		return nil
