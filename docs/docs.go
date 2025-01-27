@@ -38,7 +38,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Изменяет данные песни по группе и названию",
+                "description": "Изменяет данные песни по её ID",
                 "tags": [
                     "Music"
                 ],
@@ -46,14 +46,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Группа",
-                        "name": "group",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Песня",
+                        "description": "ID песни",
                         "name": "song",
                         "in": "query",
                         "required": true
@@ -128,7 +121,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "удаляет данные песни по группе и названию",
+                "description": "удаляет данные песни по её ID",
                 "tags": [
                     "Music"
                 ],
@@ -136,14 +129,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Группа",
-                        "name": "group",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Песня",
+                        "description": "ID песни",
                         "name": "song",
                         "in": "query",
                         "required": true
@@ -171,24 +157,17 @@ const docTemplate = `{
                 }
             }
         },
-        "/texts": {
-            "get": {
-                "description": "Возвращает текст песни по группе и названию",
+        "/info/param": {
+            "put": {
+                "description": "Изменяет данные песни по её ID",
                 "tags": [
                     "Music"
                 ],
-                "summary": "Получить текст песни",
+                "summary": "Изменить данные песни",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Группа",
-                        "name": "group",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Песня",
+                        "description": "ID песни",
                         "name": "song",
                         "in": "query",
                         "required": true
@@ -203,6 +182,56 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/texts": {
+            "get": {
+                "description": "Возвращает текст песни по её ID",
+                "tags": [
+                    "Music"
+                ],
+                "summary": "Получить текст песни",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID песни",
+                        "name": "song",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }

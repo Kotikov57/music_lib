@@ -2,6 +2,8 @@ package main
 
 import (
 	"effect_mobile/db"
+	_ "effect_mobile/docs"
+	"effect_mobile/logger"
 	"effect_mobile/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
@@ -15,6 +17,8 @@ import (
 // @BasePath /
 
 func main() {
+	logger.InitLogger()
+	logger.Log.Info("[INFO] Приложение запущено")
 	router := gin.Default()
 	db.ConnectDatabase()
 	defer db.CloseDatabase()
@@ -24,6 +28,7 @@ func main() {
 	router.GET("/texts", routes.GetText)
 	router.DELETE("/info", routes.DeleteData)
 	router.PUT("/info", routes.PutData)
+	router.PUT("/info/param", routes.PutParam)
 	router.POST("/info", routes.PostData)
 
 	router.Run(":8080")

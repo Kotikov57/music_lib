@@ -32,14 +32,9 @@ info:
 paths:
   /info:
     delete:
-      description: удаляет данные песни по группе и названию
+      description: удаляет данные песни по её ID
       parameters:
-      - description: Группа
-        in: query
-        name: group
-        required: true
-        type: string
-      - description: Песня
+      - description: ID песни
         in: query
         name: song
         required: true
@@ -103,14 +98,38 @@ paths:
       tags:
       - Music
     put:
-      description: Изменяет данные песни по группе и названию
+      description: Изменяет данные песни по её ID
       parameters:
-      - description: Группа
+      - description: ID песни
         in: query
-        name: group
+        name: song
         required: true
         type: string
-      - description: Песня
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Изменить данные песни
+      tags:
+      - Music
+  /info/param:
+    put:
+      description: Изменяет данные песни по её ID
+      parameters:
+      - description: ID песни
         in: query
         name: song
         required: true
@@ -137,14 +156,9 @@ paths:
       - Music
   /texts:
     get:
-      description: Возвращает текст песни по группе и названию
+      description: Возвращает текст песни по её ID
       parameters:
-      - description: Группа
-        in: query
-        name: group
-        required: true
-        type: string
-      - description: Песня
+      - description: ID песни
         in: query
         name: song
         required: true
@@ -156,6 +170,10 @@ paths:
             type: string
         "400":
           description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
           schema:
             type: string
         "500":

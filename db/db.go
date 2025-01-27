@@ -5,44 +5,44 @@ package db
 import (
 	"database/sql"
 	"effect_mobile/envutils"
+	"effect_mobile/logger"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"log"
 )
 
 var Db *sql.DB
 
 // ConnectDatabase подлючает к базе данных
 func ConnectDatabase() {
-	log.Println("[DEBUG] Вход в функцию ConnectDatabase")
+	logger.Log.Debug("[DEBUG] Вход в функцию ConnectDatabase")
 	dsn := envutils.GetDatabaseURL()
 	var err error
 	Db, err = sql.Open("pgx", dsn)
 	if err != nil {
-		log.Fatal("Ошибка подключения в базе данных:", err)
+		logger.Log.Fatal("Ошибка подключения в базе данных:", err)
 		return
 	}
 	if err := Db.Ping(); err != nil {
-		log.Fatal("Ошибка проверки соединения: ", err)
+		logger.Log.Fatal("Ошибка проверки соединения: ", err)
 	}
-	log.Println("[INFO] База данных подключена")
+	logger.Log.Info("[INFO] База данных подключена")
 }
 
 // CloseDatabase закрывает базу данных
 func CloseDatabase() {
-	log.Println("[DEBUG] Вход в функцию CloseDatabase")
+	logger.Log.Debug("[DEBUG] Вход в функцию CloseDatabase")
 	Db.Close()
-	log.Println("[INFO] База данных закрыта")
+	logger.Log.Info("[INFO] База данных закрыта")
 }
 
 // RunMigrations запускает миграции
 func RunMigrations() {
-	log.Println("[DEBUG] Вход в функцию CloseDatabase")
+	logger.Log.Debug("[DEBUG] Вход в функцию CloseDatabase")
 	driver, err := postgres.WithInstance(Db, &postgres.Config{})
 	if err != nil {
-		log.Fatal("Ошибка создания драйвера миграции:", err)
+		logger.Log.Fatal("Ошибка создания драйвера миграции:", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
@@ -51,11 +51,11 @@ func RunMigrations() {
 		driver,
 	)
 	if err != nil {
-		log.Fatal("Ошибка инициализации миграции:", err)
+		logger.Log.Fatal("Ошибка инициализации миграции:", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatal("Ошибка выполнения миграции:", err)
+		logger.Log.Fatal("Ошибка выполнения миграции:", err)
 	}
-	log.Println("[INFO] Миграция выполнена")
+	logger.Log.Info("[INFO] Миграция выполнена")
 }

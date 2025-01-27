@@ -2,8 +2,8 @@
 package envutils
 
 import (
+	"effect_mobile/logger"
 	"github.com/joho/godotenv"
-	"log"
 	"os"
 )
 
@@ -11,7 +11,7 @@ import (
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("[ERROR] Не удалось подключить env-файл")
+		logger.Log.Fatal("[FATAL] Не удалось подключить env-файл")
 	}
 
 }
@@ -20,7 +20,7 @@ func init() {
 func GetEnvVariable(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
-		log.Printf("[ERROR] Перменная окружения %s не задана", key)
+		logger.Log.Error("[ERROR] Перменная окружения не задана", key)
 	}
 	return value
 }

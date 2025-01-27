@@ -2,7 +2,7 @@
 
 package models
 
-import(
+import (
 	"time"
 )
 
@@ -19,8 +19,8 @@ type Song struct {
 
 type SongDetail struct {
 	ReleaseDate time.Time `json:"releaseDate"`
-	Text        string `json:"text"`
-	Link        string `json:"link"`
+	Text        string    `json:"text"`
+	Link        string    `json:"link"`
 }
 
 //MusicRequest специальная структура введённая для преобразования даты к формату "dd-mm-yyyy"
