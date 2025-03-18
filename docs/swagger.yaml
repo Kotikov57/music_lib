@@ -23,6 +23,28 @@ definitions:
       text:
         type: string
     type: object
+  routes.UpdatedPatchData:
+    properties:
+      link:
+        type: string
+      release_date:
+        type: string
+      song_name:
+        type: string
+      text:
+        type: string
+    type: object
+  routes.UpdatedPutData:
+    properties:
+      link:
+        type: string
+      release_date:
+        type: string
+      song_name:
+        type: string
+      text:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -57,6 +79,37 @@ paths:
       - Music
     get:
       description: Возвращает все данные о всех песнях
+      parameters:
+      - description: Номер страницы
+        in: query
+        name: page
+        required: true
+        type: integer
+      - description: Количество строк на странице
+        in: query
+        name: limit
+        required: true
+        type: integer
+      - description: Название группы
+        in: query
+        name: groupName
+        required: true
+        type: string
+      - description: Начальная дата фильтрации
+        in: query
+        name: startDate
+        required: true
+        type: string
+      - description: Конечная дата фильтрации
+        in: query
+        name: endDate
+        required: true
+        type: string
+      - description: Ключевое слово в тексте
+        in: query
+        name: keyword
+        required: true
+        type: string
       responses:
         "200":
           description: OK
@@ -67,6 +120,40 @@ paths:
           schema:
             type: string
       summary: Получить данные о песнях
+      tags:
+      - Music
+    patch:
+      description: Изменяет данные песни по её ID
+      parameters:
+      - description: ID песни
+        in: query
+        name: song
+        required: true
+        type: string
+      - description: Структура обновления данных
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdatedPatchData'
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Изменить данные песни
       tags:
       - Music
     post:
@@ -105,35 +192,12 @@ paths:
         name: song
         required: true
         type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-      summary: Изменить данные песни
-      tags:
-      - Music
-  /info/param:
-    put:
-      description: Изменяет данные песни по её ID
-      parameters:
-      - description: ID песни
-        in: query
-        name: song
+      - description: Структура обновления данных
+        in: body
+        name: data
         required: true
-        type: string
+        schema:
+          $ref: '#/definitions/routes.UpdatedPutData'
       responses:
         "200":
           description: OK

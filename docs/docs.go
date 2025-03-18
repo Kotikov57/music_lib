@@ -22,6 +22,50 @@ const docTemplate = `{
                     "Music"
                 ],
                 "summary": "Получить данные о песнях",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Номер страницы",
+                        "name": "page",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Количество строк на странице",
+                        "name": "limit",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название группы",
+                        "name": "groupName",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Начальная дата фильтрации",
+                        "name": "startDate",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Конечная дата фильтрации",
+                        "name": "endDate",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Ключевое слово в тексте",
+                        "name": "keyword",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -50,6 +94,15 @@ const docTemplate = `{
                         "name": "song",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "description": "Структура обновления данных",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.UpdatedPutData"
+                        }
                     }
                 ],
                 "responses": {
@@ -155,10 +208,8 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/info/param": {
-            "put": {
+            },
+            "patch": {
                 "description": "Изменяет данные песни по её ID",
                 "tags": [
                     "Music"
@@ -171,6 +222,15 @@ const docTemplate = `{
                         "name": "song",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "description": "Структура обновления данных",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.UpdatedPatchData"
+                        }
                     }
                 ],
                 "responses": {
@@ -276,6 +336,40 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "releaseDate": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.UpdatedPatchData": {
+            "type": "object",
+            "properties": {
+                "link": {
+                    "type": "string"
+                },
+                "release_date": {
+                    "type": "string"
+                },
+                "song_name": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.UpdatedPutData": {
+            "type": "object",
+            "properties": {
+                "link": {
+                    "type": "string"
+                },
+                "release_date": {
+                    "type": "string"
+                },
+                "song_name": {
                     "type": "string"
                 },
                 "text": {

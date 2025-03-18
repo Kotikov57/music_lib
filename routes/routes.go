@@ -12,18 +12,36 @@ import (
 	"effect_mobile/models"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
-
 	"github.com/gin-gonic/gin"
 )
+
+type UpdatedPutData struct {
+	Song_name    string `json:"song_name"`
+	Release_date string `json:"release_date"`
+	Text         string `json:"text"`
+	Link         string `json:"link"`
+}
+
+type UpdatedPatchData struct {
+	Song_name    *string `json:"song_name"`
+	Release_date *string `json:"release_date"`
+	Text         *string `json:"text"`
+	Link         *string `json:"link"`
+}
 
 // GetData получает все строки из базы данных
 // @Summary Получить данные о песнях
 // @Description Возвращает все данные о всех песнях
 // @Tags Music
+// @Param page query int true "Номер страницы"
+// @Param limit query int true "Количество строк на странице"
+// @Param groupName query string true "Название группы"
+// @Param startDate query string true "Начальная дата фильтрации"
+// @Param endDate query string true "Конечная дата фильтрации"
+// @Param keyword query string true "Ключевое слово в тексте"
 // @Success 200 {object} models.Music
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /info [get]
@@ -222,24 +240,21 @@ func DeleteData(c *gin.Context) {
 // @Description Изменяет данные песни по её ID
 // @Tags Music
 // @Param song query string true "ID песни"
+// @Param data body UpdatedPutData true "Структура обновления данных"
 // @Success 200 {object} string
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /info [put]
 func PutData(c *gin.Context) {
-	log.Println("[DEBUG] Вход в функцию PutData")
+	logger.Log.Debug("[DEBUG] Вход в функцию PutData")
 	songIdParam := c.Query("song")
 	DebugParam := fmt.Sprintf("[DEBUG] songParam = %s", songIdParam)
 	logger.Log.Debug(DebugParam)
 
-	var updatedDataRequest struct {
-		Song_name    string `json:"song_name"`
-		Release_date string `json:"release_date"`
-		Text         string `json:"text"`
-		Link         string `json:"link"`
-	}
-	if err := c.ShouldBindJSON(&updatedDataRequest); err != nil {
+	var UpdatedDataRequest UpdatedPutData 
+
+	if err := c.ShouldBindJSON(&UpdatedDataRequest); err != nil {
 		logger.Log.Error("[ERROR] Неверный формат данных:", err)
 		c.JSON(400, gin.H{"error": "Неверный формат данных"})
 		return
@@ -249,20 +264,21 @@ func PutData(c *gin.Context) {
 		logger.Log.Error("[ERROR] Не удалось начать транзакцию")
 		c.JSON(500, gin.H{"error": "Не получилось начать транзакцию"})
 	}
-	defer tx.Rollback()
 
-	_, err = tx.Exec("UPDATE songs SET song_name = $1 WHERE song_id = $2", updatedDataRequest.Song_name, songIdParam)
+	_, err = tx.Exec("UPDATE songs SET song_name = $1 WHERE song_id = $2", UpdatedDataRequest.Song_name, songIdParam)
 	if err != nil {
 		logger.Log.Error("[ERROR] Не удалось обновить название песни")
+		tx.Rollback()
 		c.JSON(500, gin.H{"error": "Не удалось обновить название песни"})
 		return
 	}
 
 	_, err = tx.Exec("UPDATE details SET release_date = TO_DATE($1,'DD-MM-YYYY'), text = $2, link = $3 WHERE song_id = $4",
-		updatedDataRequest.Release_date, updatedDataRequest.Text, updatedDataRequest.Link, songIdParam)
+		UpdatedDataRequest.Release_date, UpdatedDataRequest.Text, UpdatedDataRequest.Link, songIdParam)
 
 	if err != nil {
 		logger.Log.Error("[ERROR] Не удалось обновить данные песни")
+		tx.Rollback()
 		c.JSON(500, gin.H{"error": "Не удалось обновить данные песни"})
 		return
 	}
@@ -278,135 +294,85 @@ func PutData(c *gin.Context) {
 	logger.Log.Info("[INFO] Запрос успешно выполнен")
 }
 
-// PutParam изменяет конкретную информацию о конкретной песне в базе данных
+// PatchParam изменяет конкретную информацию о конкретной песне в базе данных
 // @Summary Изменить данные песни
 // @Description Изменяет данные песни по её ID
 // @Tags Music
 // @Param song query string true "ID песни"
+// @Param data body UpdatedPatchData true "Структура обновления данных"
 // @Success 200 {object} string
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
-// @Router /info/param [put]
-func PutParam(c *gin.Context) {
-	log.Println("[DEBUG] Вход в функцию PutData")
+// @Router /info [patch]
+func PatchData(c *gin.Context) {
+	logger.Log.Debug("[DEBUG] Вход в функцию PutData")	
 	songIdParam := c.Query("song")
 	DebugParam := fmt.Sprintf("[DEBUG] songParam = %s", songIdParam)
 	logger.Log.Debug(DebugParam)
-	param := c.Query("param")
 
-	switch param {
-	case "name":
-		var updatedSong struct {
-			Name string `json:"name"`
-		}
-		if err := c.ShouldBindJSON(&updatedSong); err != nil {
-			logger.Log.Error("[ERROR] Неверный формат данных:", err)
-			c.JSON(400, gin.H{"error": "Неверный формат данных"})
-			return
-		}
-		result, err := db.Db.Exec("UPDATE songs SET song_name = $1 WHERE song_id = $2", updatedSong.Name, songIdParam)
-		if err != nil {
-			logger.Log.Error("[ERROR] Не удалось обновить название песни")
-			c.JSON(500, gin.H{"error": "Не удалось обновить название песни"})
-			return
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			logger.Log.Error("[ERROR] Ошибка получения количества строк:", err)
-			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
-			return
-		}
-		if rowsAffected == 0 {
-			logger.Log.Error("[ERROR] Запись не найдена:", err)
-			c.JSON(404, gin.H{"error": "Запись не найдена"})
-			return
-		}
-	case "release_date":
-		var updatedDate struct {
-			Date string `json:"date"`
-		}
-		if err := c.ShouldBindJSON(&updatedDate); err != nil {
-			logger.Log.Error("[ERROR] Неверный формат данных:", err)
-			c.JSON(400, gin.H{"error": "Неверный формат данных"})
-			return
-		}
-		result, err := db.Db.Exec("UPDATE details SET release_date = TO_DATE($1, 'DD-MM-YYYY') WHERE song_id = $2", updatedDate.Date, songIdParam)
-		if err != nil {
-			logger.Log.Error("[ERROR] Не удалось обновить дату релиза песни:", err)
-			c.JSON(500, gin.H{"error": "Не удалось обновить дату релиза песни"})
-			return
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			logger.Log.Error("[ERROR] Ошибка получения количества строк:", err)
-			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
-			return
-		}
-		if rowsAffected == 0 {
-			logger.Log.Error("[ERROR] Запись не найдена:", err)
-			c.JSON(404, gin.H{"error": "Запись не найдена"})
-			return
-		}
-	case "text":
-		var updatedText struct {
-			Text string `json:"text"`
-		}
-		if err := c.ShouldBindJSON(&updatedText); err != nil {
-			logger.Log.Error("[ERROR] Неверный формат данных:", err)
-			c.JSON(400, gin.H{"error": "Неверный формат данных"})
-			return
-		}
-		result, err := db.Db.Exec("UPDATE details SET text = $1 WHERE song_id = $2", updatedText.Text, songIdParam)
-		if err != nil {
-			logger.Log.Error("[ERROR] Не удалось обновить текст песни:", err)
-			c.JSON(500, gin.H{"error": "Не удалось обновить текст песни"})
-			return
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			logger.Log.Error("[ERROR] Ошибка получения количества строк:", err)
-			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
-			return
-		}
-		if rowsAffected == 0 {
-			logger.Log.Error("[ERROR] Запись не найдена:", err)
-			c.JSON(404, gin.H{"error": "Запись не найдена"})
-			return
-		}
-	case "link":
-		var updatedLink struct {
-			Link string `json:"link"`
-		}
-		if err := c.ShouldBindJSON(&updatedLink); err != nil {
-			logger.Log.Error("[ERROR] Неверный формат данных:", err)
-			c.JSON(400, gin.H{"error": "Неверный формат данных"})
-			return
-		}
-		result, err := db.Db.Exec("UPDATE details SET link = $1 WHERE song_id = $2", updatedLink.Link, songIdParam)
-		if err != nil {
-			logger.Log.Error("[ERROR]Не удалось обновить ссылку на песню:", err)
-			c.JSON(500, gin.H{"error": "Не удалось обновить ссылку на песню"})
-			return
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			logger.Log.Error("[ERROR] Ошибка получения количества строк:", err)
-			c.JSON(500, gin.H{"error": "Ошибка обработки данных"})
-			return
-		}
-		if rowsAffected == 0 {
-			logger.Log.Error("[ERROR] Запись не найдена:", err)
-			c.JSON(404, gin.H{"error": "Запись не найдена"})
-			return
-		}
-	default:
-		logger.Log.Error("[ERROR] Некорректный параметр")
-		c.JSON(400, gin.H{"error": "Некорректный параметр"})
+	var UpdatedDataRequest UpdatedPatchData 
+
+	if err := c.ShouldBindJSON(&UpdatedDataRequest); err != nil {
+		logger.Log.Error("[ERROR] Неверный формат данных:", err)
+		c.JSON(400, gin.H{"error": "Неверный формат данных"})
+		return
+	}
+	tx, err := db.Db.Begin()
+	if err != nil {
+		logger.Log.Error("[ERROR] Не удалось начать транзакцию")
+		c.JSON(500, gin.H{"error": "Не получилось начать транзакцию"})
+	}
+	detailsQuery := "UPDATE details SET "
+	songQuery := ""
+	params := []interface{}{}
+	i := 1
+	if UpdatedDataRequest.Song_name != nil {
+		songQuery = "UPDATE song SET song_name = $" + fmt.Sprintf("%d",i)
+		params = append(params, *UpdatedDataRequest.Song_name)
+		i++
+	}
+	if UpdatedDataRequest.Release_date != nil {
+		detailsQuery += "release_date = $" + fmt.Sprintf("%d, ",i)
+		params = append(params, *UpdatedDataRequest.Release_date)
+		i++
+	}
+	if UpdatedDataRequest.Text != nil {
+		detailsQuery += "text = $" + fmt.Sprintf("%d, ",i)
+		params = append(params, *UpdatedDataRequest.Text)
+		i++
+	}
+	if UpdatedDataRequest.Link != nil {
+		detailsQuery += "link = $" + fmt.Sprintf("%d, ",i)
+		params = append(params, *UpdatedDataRequest.Link)
+		i++
+	}
+	detailsQuery = detailsQuery[:len(detailsQuery)-2] + " WHERE id = $" + fmt.Sprintf("%d",i)
+	params = append(params, songIdParam)
+
+	_, err = tx.Exec(detailsQuery, params...)
+	if err != nil {
+		logger.Log.Error("[ERROR] Не удалось обновить данные песни")
+		tx.Rollback()
+		c.JSON(500, gin.H{"error": "Не удалось обновить данные песни"})
+		return
 	}
 
-	c.JSON(200, gin.H{"message": "Информация обновлена"})
-	logger.Log.Info("[INFO] Запрос успешно выполнен")
+	_, err = tx.Exec(songQuery, UpdatedDataRequest.Song_name)
+	if err != nil {
+		logger.Log.Error("[ERROR] Не удалось обновить данные песни")
+		tx.Rollback()
+		c.JSON(500, gin.H{"error": "Не удалось обновить данные песни"})
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Log.Error("[ERROR] Не удалось закоммитить транзакцию")
+		c.JSON(500, gin.H{"error": "Не удалось закоммитить транзакцию"})
+		return
+	}
+	c.JSON(200, gin.H{"message":"Данные успешно обновлены"})
 }
 
 // PostData добавляет информацию о песне в базу данных
