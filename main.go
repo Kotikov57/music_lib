@@ -28,7 +28,7 @@ func main() {
 	router.GET("/texts", routes.GetText)
 	router.DELETE("/info", routes.DeleteData)
 	router.PUT("/info", routes.PutData)
-	router.PUT("/info/param", routes.PatchData)
+	router.PATCH("/info", routes.PatchData)
 	router.POST("/info", routes.PostData)
 
 	router.Run(":8080")
